@@ -9,36 +9,13 @@ from urllib.request import urlopen
 from urllib import parse
 from bs4 import BeautifulSoup
 from discord.ext import commands
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-# load_dotenv()
-# DTOKEN = os.getenv('DISCORD_TOKEN')
-# WTOKEN = os.getenv('WEATHER_TOKEN')
+load_dotenv()
+DTOKEN = os.getenv('DISCORD_TOKEN')
+WTOKEN = os.getenv('WEATHER_TOKEN')
 
 bot = commands.Bot(command_prefix='!')
-
-
-@bot.command(name='test', help='어쩌구 저쩌구')
-async def nine_nine(ctx):
-    brooklyn_99_quotes = [
-        '안녕',
-        '와우!',
-        (
-            '난 아니지만 '
-            '성현우는 확실하다.'
-        ),
-    ]
-    response = random.choice(brooklyn_99_quotes)
-    await ctx.send(response)
-
-
-@bot.command(name='roll_dice', help='Simulates rolling dice.')
-async def roll(ctx, number_of_dice: int, number_of_sides: int):
-    dice = [
-        str(random.choice(range(1, number_of_sides + 1)))
-        for _ in range(number_of_dice)
-    ]
-    await ctx.send(', '.join(dice))
 
 
 @bot.command(name='채팅채널생성', help='채팅채널을 생성합니다. (ex:!채팅채널생성 채팅채널)')
@@ -222,10 +199,13 @@ async def Todocomplete(ctx, temp: int):
 
 @bot.command(name="todo목록", help="Todo 목록을 전체 출력합니다. (ex:!todo목록)")
 async def Todolist(ctx):
-    with open('todo.txt', 'r') as f:
-        lines = f.readlines()
-        for line in lines:
-            await ctx.send(line)
+    if(os.path.isfile('todo.txt')):
+        with open('todo.txt', 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                await ctx.send(line)
+    else:
+        await ctx.send("Todo목록이 확인되지 않아요")
 
 
 @bot.event
@@ -242,7 +222,7 @@ async def on_command_error(ctx, error):
 async def on_ready():
     await bot.change_presence(status=discord.Status.dnd, activity=discord.Game('코딩매니저'))
 
-bot.run(os.environ['token'])
+bot.run(DTOKEN)
 
 # 노래, 주식
 # 비로그인 회원 찾기 방법
@@ -250,5 +230,4 @@ bot.run(os.environ['token'])
 # todo 단어 검색 강화(2가지 이상의 단어가 들어간 문장 조회기능)
 # todo 단어를 이용한 완료(현재는 번호로 완료)
 # todo 완료 여러개 동시에 할 수 있게
-# todo
-# 디스코드봇 호스팅
+# help수정
