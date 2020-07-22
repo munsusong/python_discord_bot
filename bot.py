@@ -163,8 +163,7 @@ async def Todosearch(ctx, *temp: str):
     string = ""
     for t in temp:
         string += t + " "
-    await ctx.send(string.strip())
-    if(os.path.isfile('todo.txt')):
+    if os.path.isfile('todo.txt'):
         f = open('todo.txt', 'r')
         lines = f.readlines()
         await ctx.send(string+" 포함된 문장 목록이에요.")
@@ -177,21 +176,37 @@ async def Todosearch(ctx, *temp: str):
         await ctx.send("Todo목록이 확인되지 않아요")
 
 
-@bot.command(name="todo완료", help="입력한 번호에 있는 todo를 완료합니다. (ex:!todo완료 번호)")
-async def Todocomplete(ctx, temp: int):
+@bot.command(name="todo완료", help="Todo에서 입력한 번호들을 완료합니다. (ex:!todo완료 번호 번호 번호) ")
+async def Todocomplete(ctx, *temp: int):
     count = 1
+    temp = list(temp)
 
-    if(os.path.isfile('todo.txt')):
+    if os.path.isfile('todo.txt'):
+        for i in range(len(temp)-1, 0, -1):
+            for j in range(i):
+                if temp[j] == temp[j+1]:
+                    await ctx.send("말씀하신 번호 중 중복되는 번호가 있어요, 확인 후 다시 말씀해주세요")
+                    return
+                if temp[j] > temp[j+1]:
+                    temp[j], temp[j+1] = temp[j+1], temp[j]
+
         f = open('todo.txt', 'r')
         lines = f.readlines()
-        lines.pop(temp-1)
+        for e in range(len(temp)-1, -1, -1):
+            lines.pop(temp[e]-1)
+        if not lines:
+            await ctx.send(f"{temp}번 작업이 완료되었어요.")
+            await ctx.send("이제 남은 작업이 없어요. 와우!")
+            f.close()
+            os.remove('todo.txt')
+            return
         f.close()
+
         ff = open('todo.txt', 'w')
         for e in lines:
             ff.write(f'{count}. {e[3:]}')
             count += 1
         ff.close()
-
         await ctx.send(f"{temp}번 작업이 완료되었어요.")
     else:
         await ctx.send("Todo목록이 확인되지 않아요")
@@ -199,13 +214,23 @@ async def Todocomplete(ctx, temp: int):
 
 @bot.command(name="todo목록", help="Todo 목록을 전체 출력합니다. (ex:!todo목록)")
 async def Todolist(ctx):
-    if(os.path.isfile('todo.txt')):
+    if os.path.isfile('todo.txt'):
         with open('todo.txt', 'r') as f:
             lines = f.readlines()
             for line in lines:
                 await ctx.send(line)
     else:
         await ctx.send("Todo목록이 확인되지 않아요")
+
+
+@bot.command(name="로또번호생성")
+async def rotto(ctx):
+    i = set()
+    while len(i) < 6:
+        i.add(random.randrange(1, 46))
+    i = list(i)
+    await ctx.send("제가 생각한 로또 번호에요.")
+    await ctx.send(f'{i[0]} {i[1]} {i[2]} {i[3]} {i[4]}')
 
 
 @bot.event
@@ -229,5 +254,4 @@ bot.run(DTOKEN)
 
 # todo 단어 검색 강화(2가지 이상의 단어가 들어간 문장 조회기능)
 # todo 단어를 이용한 완료(현재는 번호로 완료)
-# todo 완료 여러개 동시에 할 수 있게
 # help수정
