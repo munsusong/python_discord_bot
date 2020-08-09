@@ -4,8 +4,9 @@ import discord
 import json
 import requests
 import os.path
+import youtube_dl
 
-from urllib.request import urlopen
+from selenium import webdriver
 from urllib import parse
 from bs4 import BeautifulSoup
 from discord.ext import commands
@@ -15,43 +16,52 @@ load_dotenv()
 DTOKEN = os.getenv('DISCORD_TOKEN')
 WTOKEN = os.getenv('WEATHER_TOKEN')
 
+
+options = webdriver.ChromeOptions()
+options.add_argument('headless')
+options.add_argument('window-size=1920x1080')
+options.add_argument("disable-gpu")
+
 bot = commands.Bot(command_prefix='!')
+global mtask
+global audio
+global count
+count = 0
+
+# @bot.command(name='채팅채널생성', help='채팅채널을 생성합니다. (ex:!채팅채널생성 채팅채널)')
+# @commands.has_role('admin')
+# async def create_textchannel(ctx, channel_name: str):
+#     guild = ctx.guild
+#     existing_channel = discord.utils.get(guild.channels, name=channel_name)
+#     if not existing_channel:
+#         await guild.create_text_channel(channel_name)
+#         await ctx.send(f'\'{channel_name}\' 채널을 만들었어요.')
+#     else:
+#         await ctx.send('이미 동일한 이름의 서버가 있어요.')
 
 
-@bot.command(name='채팅채널생성', help='채팅채널을 생성합니다. (ex:!채팅채널생성 채팅채널)')
-@commands.has_role('admin')
-async def create_textchannel(ctx, channel_name: str):
-    guild = ctx.guild
-    existing_channel = discord.utils.get(guild.channels, name=channel_name)
-    if not existing_channel:
-        await guild.create_text_channel(channel_name)
-        await ctx.send(f'\'{channel_name}\' 채널을 만들었어요.')
-    else:
-        await ctx.send('이미 동일한 이름의 서버가 있어요.')
+# @bot.command(name='음성채널생성', help='음성채널을 생성합니다. (ex:!음성채널생성 음성채널)')
+# @commands.has_role('admin')
+# async def create_voice_channel(ctx, channel_name: str):
+#     guild = ctx.guild
+#     existing_channel = discord.utils.get(guild.channels, name=channel_name)
+#     if not existing_channel:
+#         await guild.create_voice_channel(channel_name)
+#         await ctx.send(f'\'{channel_name}\' 채널을 만들었어요.')
+#     else:
+#         await ctx.send('이미 동일한 이름의 서버가 있어요.')
 
 
-@bot.command(name='음성채널생성', help='음성채널을 생성합니다. (ex:!음성채널생성 음성채널)')
-@commands.has_role('admin')
-async def create_voice_channel(ctx, channel_name: str):
-    guild = ctx.guild
-    existing_channel = discord.utils.get(guild.channels, name=channel_name)
-    if not existing_channel:
-        await guild.create_voice_channel(channel_name)
-        await ctx.send(f'\'{channel_name}\' 채널을 만들었어요.')
-    else:
-        await ctx.send('이미 동일한 이름의 서버가 있어요.')
-
-
-@bot.command(name='추방', help='지정한 멤버를 추방합니다. (ex:!추방 추방할대상 추방사유)')
-@commands.has_role('admin')
-async def kick(ctx, member: str, reason: str):
-    guild = ctx.guild
-    temp = discord.utils.get(guild.members, name=member)
-    if temp:
-        await guild.kick(temp)
-        await ctx.send(f'\'{member}\' 멤버를 추방했어요.\n 사유: {reason}')
-    else:
-        await ctx.send('해당 멤버는 존재하지 않아요.')
+# @bot.command(name='추방', help='지정한 멤버를 추방합니다. (ex:!추방 추방할대상 추방사유)')
+# @commands.has_role('admin')
+# async def kick(ctx, member: str, reason: str):
+#     guild = ctx.guild
+#     temp = discord.utils.get(guild.members, name=member)
+#     if temp:
+#         await guild.kick(temp)
+#         await ctx.send(f'\'{member}\' 멤버를 추방했어요.\n 사유: {reason}')
+#     else:
+#         await ctx.send('해당 멤버는 존재하지 않아요.')
 
 
 @bot.command(name='밴', help='지정한 멤버를 밴합니다. (ex:!밴 밴할대상 밴사유)')
@@ -105,6 +115,8 @@ async def invite(ctx):
     await ctx.send(text)
 
 
+# -날씨 기능 시작
+
 # @bot.command(name="날씨", help='날씨를 검색합니다. (ex:!날씨 지역영어이름)')
 # async def weather(ctx, location: str):
 #     url = (
@@ -126,7 +138,7 @@ async def invite(ctx):
 async def weather(ctx, location: str):
     word = ["지금 ", "내일 오전", "내일 오후", "모레 오전", "모레 오후"]
     url = parse.quote(location+"날씨")
-    html = urlopen(
+    html = requests.get(
         "https://search.naver.com/search.naver?sm=top_hty&fbm=1&ie=utf8&query="+url)
     bsObject = BeautifulSoup(html, "html.parser")
 
@@ -139,6 +151,10 @@ async def weather(ctx, location: str):
     else:
         await ctx.send("말씀하신 장소는 파악되지 않은 장소에요")
 
+# -날씨 기능 끝
+
+
+# -Todo 기능 시작
 
 @bot.command(name="todo추가", help="할일을 추가합니다. (ex:!todo추가 todo에 적용할 항목)")
 async def Todoadd(ctx, *temp: str):
@@ -222,6 +238,89 @@ async def Todolist(ctx):
     else:
         await ctx.send("Todo목록이 확인되지 않아요")
 
+# -Todo 기능 끝
+
+# -음악 기능 시작
+
+@bot.command(name="음악재생")
+async def play(ctx, *temp: str):
+    global mtask
+    global count
+
+    mtask = bot.loop.create_task(music(ctx,*temp))
+
+    if count > 1:
+        mtask.cancel()
+        mtask = bot.loop.create_task(music(ctx,*temp))
+        count = 0
+    else: 
+        count += 1
+
+@bot.command(name="음악중지")
+async def stop(ctx):
+    global mtask
+    global audio
+    
+    vc = ctx.voice_client
+    vc.stop()
+    mtask.cancel()
+    audio.cleanup()
+    await vc.disconnect()
+
+async def music(ctx, *temp: str):
+    global audio
+    ydl_opts = {
+            'format': 'bestaudio/opus',
+            'outtmpl': '/%(title)s.opus',
+            'noplaylist': True,
+    }
+    title = ""
+    vc = ctx.voice_client    
+    
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        if vc:
+            if ctx.voice_client.channel != channel:
+                await ctx.voice_client.move_to(channel)
+        else:
+            vc = await channel.connect()
+    else:
+        await ctx.send("음성 채널에 접속해주세요")
+        return
+
+    if vc.is_playing():
+        vc.stop()
+        audio.cleanup()
+
+    driver = webdriver.Chrome('chromedriver', chrome_options=options)
+
+    word = ""
+    for t in temp:
+        word += t+" "
+    word = parse.quote(word)
+    driver.get("https://www.youtube.com/results?search_query="+word)
+    driver.implicitly_wait(1)
+    html = driver.page_source
+    bsObject = BeautifulSoup(html, "html.parser")
+    url = "https://www.youtube.com" + \
+        bsObject.select("ytd-video-renderer a")[0]['href']
+    driver.close()
+    await ctx.send(url)
+
+    try:
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+            info = ydl.extract_info(url, download=False)
+            title = ydl.prepare_filename(info)
+    except Exception as e:
+        print(e)
+        await ctx.send("다운 실패")
+
+    audio = discord.FFmpegOpusAudio(executable="./ffmpeg/bin/ffmpeg.exe",source=f'{title}')
+    vc.play(audio)    
+    
+# -음악 기능 끝
+  
 
 @bot.command(name="로또번호생성")
 async def rotto(ctx):
