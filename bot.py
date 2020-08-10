@@ -26,6 +26,10 @@ bot = commands.Bot(command_prefix='!')
 global mtask
 global audio
 global count
+global title
+global musiclist
+
+musiclist = []
 count = 0
 
 # @bot.command(name='채팅채널생성', help='채팅채널을 생성합니다. (ex:!채팅채널생성 채팅채널)')
@@ -244,39 +248,50 @@ async def Todolist(ctx):
 
 @bot.command(name="음악재생")
 async def play(ctx, *temp: str):
-    global mtask
-    global count
+    global musiclist
+    global title
 
-    mtask = bot.loop.create_task(music(ctx,*temp))
+    word = ""
+    for t in temp:
+        word += t+" "
+    word = parse.quote(word)
+    url = "https://www.youtube.com/results?search_query="+word
+    driver = webdriver.Chrome('chromedriver', chrome_options=options)
+    driver.get(url)
+    driver.implicitly_wait(1)
+    html = driver.page_source
+    bsObject = BeautifulSoup(html, "html.parser")
+    url = "https://www.youtube.com" + \
+        bsObject.select("ytd-video-renderer a")[0]['href']
+    driver.close()
+    await ctx.send(url)
+    musiclist.append(url)
 
-    if count > 1:
-        mtask.cancel()
-        mtask = bot.loop.create_task(music(ctx,*temp))
-        count = 0
-    else: 
-        count += 1
+    if ctx.voice_client:
+        if ctx.voice_client.is_playing():
+            await ctx.send("재생 목록에 추가했어요")
+        else:
+            await music(ctx)
+    else:
+        await music(ctx)
 
 @bot.command(name="음악중지")
 async def stop(ctx):
-    global mtask
     global audio
     
     vc = ctx.voice_client
     vc.stop()
-    mtask.cancel()
     audio.cleanup()
     await vc.disconnect()
+    os.remove(f'{title}')
 
-async def music(ctx, *temp: str):
+async def music(ctx):
     global audio
-    ydl_opts = {
-            'format': 'bestaudio/opus',
-            'outtmpl': '/%(title)s.opus',
-            'noplaylist': True,
-    }
-    title = ""
+    global title
+    global musiclist
+
     vc = ctx.voice_client    
-    
+
     if ctx.author.voice:
         channel = ctx.author.voice.channel
         if vc:
@@ -288,37 +303,28 @@ async def music(ctx, *temp: str):
         await ctx.send("음성 채널에 접속해주세요")
         return
 
-    if vc.is_playing():
-        vc.stop()
-        audio.cleanup()
+    if not vc.is_playing() and musiclist:
+        ydl_opts = {
+                'format': 'bestaudio/opus',
+                'outtmpl': '/music/%(title)s.opus',
+                'noplaylist': True,
+        }
 
-    driver = webdriver.Chrome('chromedriver', chrome_options=options)
+        try:
+            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([musiclist[0]])
+                info = ydl.extract_info(musiclist[0], download=False)
+                title = ydl.prepare_filename(info)
+        except Exception as e:
+            print(e)
+            await ctx.send("음악 다운로드에 실패했어요")
 
-    word = ""
-    for t in temp:
-        word += t+" "
-    word = parse.quote(word)
-    driver.get("https://www.youtube.com/results?search_query="+word)
-    driver.implicitly_wait(1)
-    html = driver.page_source
-    bsObject = BeautifulSoup(html, "html.parser")
-    url = "https://www.youtube.com" + \
-        bsObject.select("ytd-video-renderer a")[0]['href']
-    driver.close()
-    await ctx.send(url)
+        audio = discord.FFmpegOpusAudio(executable="./ffmpeg/bin/ffmpeg.exe",source=f'{title}')
+        vc.play(audio)
+        musiclist.pop(0)    
 
-    try:
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-            info = ydl.extract_info(url, download=False)
-            title = ydl.prepare_filename(info)
-    except Exception as e:
-        print(e)
-        await ctx.send("다운 실패")
+    await music(ctx)
 
-    audio = discord.FFmpegOpusAudio(executable="./ffmpeg/bin/ffmpeg.exe",source=f'{title}')
-    vc.play(audio)    
-    
 # -음악 기능 끝
   
 
